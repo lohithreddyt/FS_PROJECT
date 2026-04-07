@@ -44,6 +44,13 @@ export default function MyReports({ reports, onNav }) {
                   <span style={{ fontSize: 12, color: "var(--muted)" }}>{r.concerns}</span>
                 </div>
               )}
+
+              {r.status === "rejected" && r.rejectionReason && (
+                <div style={{ marginTop: 11, padding: "9px 13px", background: "rgba(239,68,68,0.05)", borderRadius: 8, border: "1px solid rgba(239,68,68,0.2)" }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, color: "#ef4444", letterSpacing: 0.5, textTransform: "uppercase" }}>Rejection Reason: </span>
+                  <span style={{ fontSize: 12, color: "#ef4444" }}>{r.rejectionReason}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

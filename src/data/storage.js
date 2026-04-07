@@ -114,6 +114,21 @@ export const approveListing = (id) => {
   saveUsers(users);
 };
 
+/** Reject a listing (pending → rejected) and sync to user reports */
+export const rejectListing = (id, reason) => {
+  const listings = DB.listings.map(l => l.id === id ? { ...l, status: "rejected", rejectionReason: reason } : l);
+  saveListings(listings);
+
+  // Also update status and add reason in user reports
+  const users = DB.users.map(u => ({
+    ...u,
+    reports: u.reports
+      ? u.reports.map(r => r.id === id ? { ...r, status: "rejected", rejectionReason: reason } : r)
+      : [],
+  }));
+  saveUsers(users);
+};
+
 // ── Session helpers ───────────────────────────────────────────────────────────
 
 /** Save logged-in user's email + role to session so page reload auto-logs in */

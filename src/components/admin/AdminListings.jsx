@@ -1,7 +1,7 @@
 // src/components/admin/AdminListings.jsx
 
-export default function AdminListings({ listings, listingFilter, setListingFilter, onApprove, onDelete }) {
-  const STATUSES = ["All", "pending", "active", "review"];
+export default function AdminListings({ listings, listingFilter, setListingFilter, onApprove, onReject, onDelete }) {
+  const STATUSES = ["All", "pending", "active", "review", "rejected"];
 
   const filtered = [...listings]
     .reverse()
@@ -55,17 +55,30 @@ export default function AdminListings({ listings, listingFilter, setListingFilte
               <td>
                 <div style={{ display: "flex", gap: 5 }}>
                   {l.status === "pending" && (
-                    <button
-                      style={{
-                        background: "rgba(22,163,74,0.1)", color: "var(--success)",
-                        border: "1px solid rgba(22,163,74,0.25)", padding: "5px 9px",
-                        borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: "pointer",
-                        fontFamily: "'Plus Jakarta Sans', sans-serif", transition: "all 0.2s",
-                      }}
-                      onClick={() => onApprove(l.id)}
-                    >
-                      ✓ Approve
-                    </button>
+                    <>
+                      <button
+                        style={{
+                          background: "rgba(22,163,74,0.1)", color: "var(--success)",
+                          border: "1px solid rgba(22,163,74,0.25)", padding: "5px 9px",
+                          borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                          fontFamily: "'Plus Jakarta Sans', sans-serif", transition: "all 0.2s",
+                        }}
+                        onClick={() => onApprove(l.id)}
+                      >
+                        ✓ Approve
+                      </button>
+                      <button
+                        style={{
+                          background: "rgba(239,68,68,0.1)", color: "#ef4444",
+                          border: "1px solid rgba(239,68,68,0.25)", padding: "5px 9px",
+                          borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                          fontFamily: "'Plus Jakarta Sans', sans-serif", transition: "all 0.2s",
+                        }}
+                        onClick={() => onReject(l.id)}
+                      >
+                        ✕ Reject
+                      </button>
+                    </>
                   )}
                   <button className="btn-d" onClick={() => onDelete(l.id)}>✕</button>
                 </div>

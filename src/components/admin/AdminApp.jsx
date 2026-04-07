@@ -1,7 +1,7 @@
 // src/components/admin/AdminApp.jsx
 import { useState } from "react";
 import { RECS } from "../../data/db.js";
-import { DB, deleteListing, approveListing } from "../../data/storage.js";
+import { DB, deleteListing, approveListing, rejectListing } from "../../data/storage.js";
 import Sidebar from "../shared/Sidebar.jsx";
 import Toast from "../shared/Toast.jsx";
 import AdminDashboard from "./AdminDashboard.jsx";
@@ -19,7 +19,8 @@ export default function AdminApp({ currentUser, onLogout }) {
   const [recs,          setRecs]          = useState([...RECS]);
   const [listings,      setListings]      = useState(() => DB.listings);
   const [newRec,        setNewRec]        = useState({ title: "", category: "Interior", cost: "", roi: "", desc: "" });
-
+  const [rejectTarget,  setRejectTarget]  = useState(null);
+  const [rejectReason,  setRejectReason]  = useState("");
   const showToast = m => { setToast(m); setTimeout(() => setToast(null), 3200); };
 
   // Re-read listings from localStorage (picks up user submissions)
@@ -42,6 +43,22 @@ export default function AdminApp({ currentUser, onLogout }) {
     approveListing(id);          // persists status change to localStorage + user reports
     setListings(DB.listings);    // refresh local state from storage
     showToast("✅ Listing approved and set to Active.");
+  };
+
+  const handleRejectPrompt = id => {
+    setRejectTarget(id);
+    setRejectReason("");
+    setModal("rejectListing");
+  };
+
+  const submitRejectListing = () => {
+    if (!rejectReason.trim()) { showToast("⚠ Please provide a reason for rejection."); return; }
+    rejectListing(rejectTarget, rejectReason);
+    setListings(DB.listings);
+    setModal(null);
+    setRejectTarget(null);
+    setRejectReason("");
+    showToast("❌ Listing rejected.");
   };
 
   const addRec = () => {
@@ -112,6 +129,7 @@ export default function AdminApp({ currentUser, onLogout }) {
               listingFilter={listingFilter}
               setListingFilter={setListingFilter}
               onApprove={handleApproveListing}
+              onReject={handleRejectPrompt}
               onDelete={handleDeleteListing}
             />
           )}
@@ -127,6 +145,26 @@ export default function AdminApp({ currentUser, onLogout }) {
           onAdd={addRec}
           onClose={() => setModal(null)}
         />
+      )}
+
+      {modal === "rejectListing" && (
+        <div className="modal-overlay" onClick={() => setModal(null)}>
+          <div className="modal-content" style={{ padding: "24px", width: "400px", maxWidth: "90%" }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ fontSize: "18px", fontWeight: "600", marginBottom: "8px" }}>Reject Listing</h2>
+            <p style={{ fontSize: "13px", color: "var(--muted)", marginBottom: "16px" }}>Please provide a reason for rejecting this property.</p>
+            <textarea 
+              className="finput" 
+              style={{ width: "100%", height: "80px", marginBottom: "16px", resize: "none" }} 
+              placeholder="e.g. Incomplete details..."
+              value={rejectReason}
+              onChange={e => setRejectReason(e.target.value)}
+            />
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+              <button className="btn-s" onClick={() => setModal(null)}>Cancel</button>
+              <button className="btn-p" style={{ backgroundColor: "#ef4444" }} onClick={submitRejectListing}>Reject</button>
+            </div>
+          </div>
+        </div>
       )}
 
       <Toast message={toast} />
