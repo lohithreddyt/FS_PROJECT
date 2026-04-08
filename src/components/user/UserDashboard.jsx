@@ -1,8 +1,9 @@
 // src/components/user/UserDashboard.jsx
 import { RECS } from "../../data/db.js";
 
-export default function UserDashboard({ currentUser, onNav, openRec }) {
-  const isNew = currentUser.reports.length === 0;
+export default function UserDashboard({ currentUser, reports = [], onNav, openRec }) {
+  const userReports = Array.isArray(reports) ? reports : [];
+  const isNew = userReports.length === 0;
 
   if (isNew) {
     return (
@@ -61,14 +62,14 @@ export default function UserDashboard({ currentUser, onNav, openRec }) {
         <div className="hero-h">Welcome back,<br />{currentUser.name.split(" ")[0]}!</div>
         <div className="hero-desc">Your property enhancement journey is underway. Track your reports and discover new ideas.</div>
         <div className="hero-chips">
-          <div className="hchip">📋 {currentUser.reports.length} Report{currentUser.reports.length !== 1 ? "s" : ""} Submitted</div>
-          <div className="hchip">⏳ {currentUser.reports.filter(r => r.status === "pending").length} Pending</div>
+          <div className="hchip">📋 {userReports.length} Report{userReports.length !== 1 ? "s" : ""} Submitted</div>
+          <div className="hchip">⏳ {userReports.filter(r => r.status === "pending").length} Pending</div>
         </div>
       </div>
 
       <div className="stats-grid">
-        <div className="stat-card sc-brand"><div className="stat-ico">📋</div><div className="stat-lbl">My Submissions</div><div className="stat-val">{currentUser.reports.length}</div></div>
-        <div className="stat-card sc-gold"><div className="stat-ico">⏳</div><div className="stat-lbl">Pending Review</div><div className="stat-val">{currentUser.reports.filter(r => r.status === "pending").length}</div></div>
+        <div className="stat-card sc-brand"><div className="stat-ico">📋</div><div className="stat-lbl">My Submissions</div><div className="stat-val">{userReports.length}</div></div>
+        <div className="stat-card sc-gold"><div className="stat-ico">⏳</div><div className="stat-lbl">Pending Review</div><div className="stat-val">{userReports.filter(r => r.status === "pending").length}</div></div>
         <div className="stat-card sc-teal"><div className="stat-ico">✦</div><div className="stat-lbl">Ideas Available</div><div className="stat-val">{RECS.length}</div></div>
         <div className="stat-card sc-green"><div className="stat-ico">⭐</div><div className="stat-lbl">Avg Platform Rating</div><div className="stat-val">4.8</div></div>
       </div>
@@ -81,7 +82,7 @@ export default function UserDashboard({ currentUser, onNav, openRec }) {
         <table className="tbl">
           <thead><tr><th>Location</th><th>Type</th><th>Status</th><th>Date</th></tr></thead>
           <tbody>
-            {[...currentUser.reports].reverse().slice(0, 3).map(r => (
+            {[...userReports].reverse().slice(0, 3).map(r => (
               <tr key={r.id}>
                 <td><strong>{r.location}</strong><br /><span style={{ fontSize: 11, color: "var(--muted)" }}>{r.area}</span></td>
                 <td><span className="chip">{r.type}</span></td>

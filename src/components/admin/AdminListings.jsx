@@ -1,11 +1,11 @@
-// src/components/admin/AdminListings.jsx
-
-export default function AdminListings({ listings, listingFilter, setListingFilter, onApprove, onReject, onDelete }) {
-  const STATUSES = ["All", "pending", "active", "review", "rejected"];
-
-  const filtered = [...listings]
-    .reverse()
-    .filter(l => listingFilter === "All" || l.status === listingFilter);
+export default function AdminListings({ listings, listingFilter, setListingFilter, searchTerm, setSearchTerm, onApprove, onReject, onDelete }) {
+  const statuses = ["All", "pending", "active", "review", "rejected"];
+  const filtered = listings.filter(listing => {
+    const matchesStatus = listingFilter === "All" || listing.status === listingFilter;
+    const term = searchTerm.trim().toLowerCase();
+    const matchesSearch = !term || `${listing.name} ${listing.location} ${listing.type} ${listing.id}`.toLowerCase().includes(term);
+    return matchesStatus && matchesSearch;
+  });
 
   return (
     <div className="sc">
@@ -14,20 +14,15 @@ export default function AdminListings({ listings, listingFilter, setListingFilte
           <div className="sc-title">All Property Submissions</div>
           <div className="sc-desc">{listings.length} listings</div>
         </div>
-        <input className="finput" placeholder="Search..." style={{ width: 190, fontSize: 13 }} />
+        <input className="finput" placeholder="Search by owner, city, or id" style={{ width: 220, fontSize: 13 }} value={searchTerm} onChange={event => setSearchTerm(event.target.value)} />
       </div>
 
-      {/* Status filter tabs */}
       <div className="ftabs" style={{ marginBottom: 18 }}>
-        {STATUSES.map(s => {
-          const count = s === "All" ? listings.length : listings.filter(l => l.status === s).length;
+        {statuses.map(status => {
+          const count = status === "All" ? listings.length : listings.filter(listing => listing.status === status).length;
           return (
-            <button
-              key={s}
-              className={`ftab ${listingFilter === s ? "active" : ""}`}
-              onClick={() => setListingFilter(s)}
-            >
-              {s === "All" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
+            <button key={status} className={`ftab ${listingFilter === status ? "active" : ""}`} onClick={() => setListingFilter(status)}>
+              {status === "All" ? "All" : status.charAt(0).toUpperCase() + status.slice(1)}
               <span style={{ fontWeight: 400, opacity: 0.75 }}> ({count})</span>
             </button>
           );
@@ -37,50 +32,29 @@ export default function AdminListings({ listings, listingFilter, setListingFilte
       <table className="tbl">
         <thead>
           <tr>
-            <th>ID</th><th>Owner</th><th>Location</th><th>Type</th>
-            <th>Area</th><th>Budget</th><th>Status</th><th>Date</th><th>Actions</th>
+            <th>ID</th><th>Owner</th><th>Location</th><th>Type</th><th>Area</th><th>Budget</th><th>Status</th><th>Date</th><th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {filtered.map(l => (
-            <tr key={l.id}>
-              <td><span style={{ fontSize: 11, fontFamily: "monospace", color: "var(--muted)" }}>{l.id}</span></td>
-              <td><strong>{l.name}</strong></td>
-              <td style={{ fontSize: 12 }}>{l.location}</td>
-              <td><span className="chip">{l.type}</span></td>
-              <td style={{ fontSize: 12 }}>{l.area}</td>
-              <td style={{ fontSize: 12 }}>{l.budget}</td>
-              <td><span className={`sp sp-${l.status}`}>{l.status}</span></td>
-              <td style={{ fontSize: 11, color: "var(--muted)" }}>{l.submitted}</td>
+          {filtered.map(listing => (
+            <tr key={listing.id}>
+              <td><span style={{ fontSize: 11, fontFamily: "monospace", color: "var(--muted)" }}>{listing.id}</span></td>
+              <td><strong>{listing.name}</strong></td>
+              <td style={{ fontSize: 12 }}>{listing.location}</td>
+              <td><span className="chip">{listing.type}</span></td>
+              <td style={{ fontSize: 12 }}>{listing.area}</td>
+              <td style={{ fontSize: 12 }}>{listing.budget}</td>
+              <td><span className={`sp sp-${listing.status}`}>{listing.status}</span></td>
+              <td style={{ fontSize: 11, color: "var(--muted)" }}>{listing.submitted}</td>
               <td>
                 <div style={{ display: "flex", gap: 5 }}>
-                  {l.status === "pending" && (
+                  {listing.status === "pending" && (
                     <>
-                      <button
-                        style={{
-                          background: "rgba(22,163,74,0.1)", color: "var(--success)",
-                          border: "1px solid rgba(22,163,74,0.25)", padding: "5px 9px",
-                          borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: "pointer",
-                          fontFamily: "'Plus Jakarta Sans', sans-serif", transition: "all 0.2s",
-                        }}
-                        onClick={() => onApprove(l.id)}
-                      >
-                        ✓ Approve
-                      </button>
-                      <button
-                        style={{
-                          background: "rgba(239,68,68,0.1)", color: "#ef4444",
-                          border: "1px solid rgba(239,68,68,0.25)", padding: "5px 9px",
-                          borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: "pointer",
-                          fontFamily: "'Plus Jakarta Sans', sans-serif", transition: "all 0.2s",
-                        }}
-                        onClick={() => onReject(l.id)}
-                      >
-                        ✕ Reject
-                      </button>
+                      <button style={{ background: "rgba(22,163,74,0.1)", color: "var(--success)", border: "1px solid rgba(22,163,74,0.25)", padding: "5px 9px", borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: "pointer" }} onClick={() => onApprove(listing.id)}>Approve</button>
+                      <button style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.25)", padding: "5px 9px", borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: "pointer" }} onClick={() => onReject(listing.id)}>Reject</button>
                     </>
                   )}
-                  <button className="btn-d" onClick={() => onDelete(l.id)}>✕</button>
+                  <button className="btn-d" onClick={() => onDelete(listing.id)}>X</button>
                 </div>
               </td>
             </tr>
@@ -88,11 +62,7 @@ export default function AdminListings({ listings, listingFilter, setListingFilte
         </tbody>
       </table>
 
-      {filtered.length === 0 && (
-        <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--muted)", fontSize: 13 }}>
-          No listings found for this status.
-        </div>
-      )}
+      {filtered.length === 0 && <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--muted)", fontSize: 13 }}>No listings found for this filter.</div>}
     </div>
   );
 }

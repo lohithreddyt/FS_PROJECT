@@ -1,39 +1,61 @@
-// src/App.jsx
-import { useState } from "react";
-import { DB, updateUserRecord, saveSession, loadSession, clearSession } from "./data/storage.js";
+import { useEffect, useState } from "react";
+import { authApi } from "./api/services.js";
 import AuthPage from "./components/auth/AuthPage.jsx";
-import UserApp  from "./components/user/UserApp.jsx";
+import UserApp from "./components/user/UserApp.jsx";
 import AdminApp from "./components/admin/AdminApp.jsx";
 import "./styles/global.css";
 
-// ── Restore session from localStorage on first load ───────────────────────────
-function resolveSession() {
-  const session = loadSession();
-  if (!session) return null;
-  const list = session.role === "admin" ? DB.admins : DB.users;
-  return list.find(u => u.email === session.email) || null;
-}
-
 export default function App() {
-  const [currentUser, setCurrentUser] = useState(() => resolveSession());
+  const [currentUser, setCurrentUser] = useState(null);
+  const [booting, setBooting] = useState(true);
 
-  // Called by UserApp whenever user data changes (e.g. new report submitted)
-  const updateUser = updated => {
-    setCurrentUser(updated);
-    updateUserRecord(updated);   // persist to localStorage
-    saveSession(updated);        // keep session fresh
+  useEffect(() => {
+    let active = true;
+    authApi
+      .session()
+      .then(user => {
+        if (active) setCurrentUser(user);
+      })
+      .catch(() => {
+        if (active) setCurrentUser(null);
+      })
+      .finally(() => {
+        if (active) setBooting(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+    } finally {
+      setCurrentUser(null);
+      window.location.hash = "#/";
+    }
   };
 
-  const handleLogout = () => {
-    clearSession();
-    setCurrentUser(null);
-  };
+  if (booting) {
+    return (
+      <div className="auth-root">
+        <div className="auth-panel">
+          <div className="auth-box" style={{ textAlign: "center" }}>
+            <div className="auth-h">Loading BetterHome</div>
+            <div className="auth-sub-text">Checking your session and preparing the dashboard.</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-  return (
-    <>
-      {!currentUser && <AuthPage onLogin={user => { saveSession(user); setCurrentUser(user); }} />}
-      {currentUser?.role === "user"  && <UserApp  currentUser={currentUser} onLogout={handleLogout} updateUser={updateUser} />}
-      {currentUser?.role === "admin" && <AdminApp currentUser={currentUser} onLogout={handleLogout} />}
-    </>
+  if (!currentUser) {
+    return <AuthPage onLogin={setCurrentUser} />;
+  }
+
+  return currentUser.role === "admin" ? (
+    <AdminApp currentUser={currentUser} onLogout={handleLogout} />
+  ) : (
+    <UserApp currentUser={currentUser} onLogout={handleLogout} />
   );
 }
