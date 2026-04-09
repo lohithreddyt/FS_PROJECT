@@ -75,8 +75,10 @@ export const updateUserRecord = (updatedUser) => {
   const idx = users.findIndex(u => u.email === updatedUser.email);
   if (idx !== -1) {
     users[idx] = updatedUser;
-    saveUsers(users);
+  } else {
+    users.push(updatedUser);
   }
+  saveUsers(users);
 };
 
 /** Add a listing and persist */
@@ -84,6 +86,17 @@ export const addListing = (listing) => {
   const listings = DB.listings;
   listings.push(listing);
   saveListings(listings);
+};
+
+/** Reconstruct user reports from listing ownership when stored reports are missing */
+export const getReportsForUser = (email, name) => {
+  const normalizedEmail = String(email || "").toLowerCase();
+  const normalizedName = String(name || "").toLowerCase();
+  return DB.listings.filter(listing => {
+    const listingEmail = String(listing.ownerEmail || "").toLowerCase();
+    const listingName = String(listing.ownerName || listing.name || "").toLowerCase();
+    return listingEmail === normalizedEmail || (listingEmail === "" && listingName === normalizedName);
+  });
 };
 
 /** Delete a listing by id, also remove from matching user reports, then persist */

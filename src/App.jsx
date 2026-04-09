@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { authApi } from "./api/services.js";
+import { DB, getReportsForUser, updateUserRecord, registerUser } from "./data/storage.js";
 import AuthPage from "./components/auth/AuthPage.jsx";
 import UserApp from "./components/user/UserApp.jsx";
 import AdminApp from "./components/admin/AdminApp.jsx";
@@ -14,7 +15,17 @@ export default function App() {
     authApi
       .session()
       .then(user => {
-        if (active) setCurrentUser(user);
+        if (!active) return;
+        let stored = DB.users.find(u => u.email === user.email);
+        if (!stored && user.role === "user") {
+          stored = { email: user.email, name: user.name || user.email, role: user.role, reports: [] };
+          registerUser(stored);
+        }
+
+        setCurrentUser({
+          ...user,
+          reports: stored?.reports?.length > 0 ? stored.reports : getReportsForUser(user.email, user.name),
+        });
       })
       .catch(() => {
         if (active) setCurrentUser(null);
@@ -36,6 +47,24 @@ export default function App() {
     }
   };
 
+  const handleLogin = user => {
+    let stored = DB.users.find(u => u.email === user.email);
+    if (!stored && user.role === "user") {
+      stored = { email: user.email, name: user.name || user.email, role: user.role, reports: [] };
+      registerUser(stored);
+    }
+
+    setCurrentUser({
+      ...user,
+      reports: stored?.reports?.length > 0 ? stored.reports : getReportsForUser(user.email, user.name),
+    });
+  };
+
+  const handleUpdateUser = updatedUser => {
+    setCurrentUser(updatedUser);
+    updateUserRecord(updatedUser);
+  };
+
   if (booting) {
     return (
       <div className="auth-root">
@@ -50,12 +79,12 @@ export default function App() {
   }
 
   if (!currentUser) {
-    return <AuthPage onLogin={setCurrentUser} />;
+    return <AuthPage onLogin={handleLogin} />;
   }
 
   return currentUser.role === "admin" ? (
     <AdminApp currentUser={currentUser} onLogout={handleLogout} />
   ) : (
-    <UserApp currentUser={currentUser} onLogout={handleLogout} />
+    <UserApp currentUser={currentUser} onLogout={handleLogout} updateUser={handleUpdateUser} />
   );
 }

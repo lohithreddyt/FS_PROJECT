@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { analyticsApi, listingApi, recommendationApi } from "../../api/services.js";
-import useHashRoute from "../../hooks/useHashRoute.js";
-import { normalizeRecommendation } from "../../utils/recommendations.js";
+import { useState } from "react";
+import { RECS } from "../../data/db.js";
+import { DB, deleteListing, approveListing, rejectListing } from "../../data/storage.js";
 import Sidebar from "../shared/Sidebar.jsx";
 import Toast from "../shared/Toast.jsx";
 import AdminDashboard from "./AdminDashboard.jsx";
@@ -10,105 +9,44 @@ import AdminListings from "./AdminListings.jsx";
 import AdminAnalytics from "./AdminAnalytics.jsx";
 import AddRecModal from "./AddRecModal.jsx";
 
-function formatListing(listing) {
-  return {
-    ...listing,
-    name: listing.ownerName,
-    submitted: new Date(listing.submittedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
-  };
-}
-
-function extractError(error) {
-  return error?.response?.data?.message || "Something went wrong. Please try again.";
-}
-
 export default function AdminApp({ currentUser, onLogout }) {
-  const [nav, setNav] = useHashRoute("admin", "dashboard");
+  const [nav, setNav] = useState("dashboard");
   const [filter, setFilter] = useState("All");
   const [listingFilter, setListingFilter] = useState("All");
   const [listingSearch, setListingSearch] = useState("");
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState(null);
-  const [recs, setRecs] = useState([]);
-  const [listings, setListings] = useState([]);
-  const [analytics, setAnalytics] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [savingRec, setSavingRec] = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
+  const [recs, setRecs] = useState([...RECS]);
+  const [listings, setListings] = useState(() => DB.listings);
+  const [newRec, setNewRec] = useState({ title: "", category: "Interior", cost: "", roi: "", desc: "" });
   const [rejectTarget, setRejectTarget] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
-  const [newRec, setNewRec] = useState({ title: "", category: "Interior", cost: "", roi: "", desc: "" });
 
-  const showToast = message => {
-    setToast(message);
+  const showToast = m => {
+    setToast(m);
     window.clearTimeout(showToast.timer);
     showToast.timer = window.setTimeout(() => setToast(null), 3200);
   };
 
-  const loadAll = async () => {
-    const [recData, listingData, analyticsData] = await Promise.all([
-      recommendationApi.list(),
-      listingApi.list(),
-      analyticsApi.get(),
-    ]);
-    setRecs(recData.map(normalizeRecommendation));
-    setListings(listingData.map(formatListing));
-    setAnalytics(analyticsData);
+  const refreshListings = () => setListings(DB.listings);
+
+  const filteredRecs = filter === "All" ? recs : recs.filter(r => r.category === filter);
+
+  const handleDeleteRec = id => {
+    setRecs(p => p.filter(r => r.id !== id));
+    showToast("🗑 Recommendation removed.");
   };
 
-  useEffect(() => {
-    let active = true;
-    loadAll()
-      .catch(error => active && showToast(extractError(error)))
-      .finally(() => active && setLoading(false));
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const filteredRecs = useMemo(() => {
-    return filter === "All" ? recs : recs.filter(rec => rec.category === filter);
-  }, [filter, recs]);
-
-  const refreshAnalytics = async () => {
-    const [listingData, analyticsData] = await Promise.all([listingApi.list(), analyticsApi.get()]);
-    setListings(listingData.map(formatListing));
-    setAnalytics(analyticsData);
+  const handleDeleteListing = id => {
+    deleteListing(id);
+    setListings(DB.listings);
+    showToast("🗑 Listing removed.");
   };
 
-  const handleDeleteRec = async id => {
-    try {
-      setDeletingId(id);
-      await recommendationApi.remove(id);
-      setRecs(prev => prev.filter(rec => rec.id !== id));
-      showToast("Recommendation removed.");
-      setDeletingId(null);
-      const analyticsData = await analyticsApi.get();
-      setAnalytics(analyticsData);
-    } catch (error) {
-      setDeletingId(null);
-      showToast(extractError(error));
-    }
-  };
-
-  const handleDeleteListing = async id => {
-    try {
-      await listingApi.remove(id);
-      await refreshAnalytics();
-      showToast("Listing removed.");
-    } catch (error) {
-      showToast(extractError(error));
-    }
-  };
-
-  const handleApproveListing = async id => {
-    try {
-      await listingApi.updateStatus(id, { status: "active" });
-      await refreshAnalytics();
-      showToast("Listing approved and set to Active.");
-    } catch (error) {
-      showToast(extractError(error));
-    }
+  const handleApproveListing = id => {
+    approveListing(id);
+    setListings(DB.listings);
+    showToast("✅ Listing approved and set to Active.");
   };
 
   const handleRejectPrompt = id => {
@@ -117,58 +55,43 @@ export default function AdminApp({ currentUser, onLogout }) {
     setModal("rejectListing");
   };
 
-  const submitRejectListing = async () => {
+  const submitRejectListing = () => {
     if (!rejectReason.trim()) {
-      showToast("Please provide a reason for rejection.");
+      showToast("⚠ Please provide a reason for rejection.");
       return;
     }
 
-    try {
-      await listingApi.updateStatus(rejectTarget, { status: "rejected", rejectionReason: rejectReason });
-      await refreshAnalytics();
-      setModal(null);
-      setRejectTarget(null);
-      setRejectReason("");
-      showToast("Listing rejected.");
-    } catch (error) {
-      showToast(extractError(error));
-    }
+    rejectListing(rejectTarget, rejectReason);
+    setListings(DB.listings);
+    setModal(null);
+    setRejectTarget(null);
+    showToast("Listing rejected.");
   };
 
-  const addRec = async () => {
-    if (!newRec.title || !newRec.desc || !newRec.cost || !newRec.roi) {
-      showToast("Title, description, cost, and ROI are required.");
+  const addRec = () => {
+    if (!newRec.title || !newRec.desc) {
+      showToast("⚠ Title and description required.");
       return;
     }
-
-    try {
-      setSavingRec(true);
-      const created = await recommendationApi.create({
-        title: newRec.title,
-        category: newRec.category,
-        description: newRec.desc,
-        cost: newRec.cost,
-        roi: newRec.roi,
-        actionText: "New admin recommendation",
-      });
-      setRecs(prev => [...prev, normalizeRecommendation(created)]);
-      setModal(null);
-      setNewRec({ title: "", category: "Interior", cost: "", roi: "", desc: "" });
-      showToast("Recommendation published.");
-      const analyticsData = await analyticsApi.get();
-      setAnalytics(analyticsData);
-    } catch (error) {
-      showToast(extractError(error));
-    } finally {
-      setSavingRec(false);
-    }
+    setRecs(p => [...p, {
+      id: Date.now(),
+      ...newRec,
+      color: "#F5F0FF",
+      catColor: "#7C3AED",
+      emoji: "✨",
+      tags: [newRec.category],
+      rating: 4.5,
+    }] );
+    showToast("✅ Recommendation published!");
+    setModal(null);
+    setNewRec({ title: "", category: "Interior", cost: "", roi: "", desc: "" });
   };
 
   const navItems = [
-    { id: "dashboard", ico: "D", lbl: "Dashboard" },
-    { id: "recommendations", ico: "R", lbl: "Recommendations" },
-    { id: "listings", ico: "L", lbl: "Property Listings", badge: listings.filter(listing => listing.status === "pending").length || null },
-    { id: "analytics", ico: "A", lbl: "Analytics" },
+    { id: "dashboard", ico: "⊞", lbl: "Dashboard" },
+    { id: "recommendations", ico: "✦", lbl: "Recommendations" },
+    { id: "listings", ico: "🏘", lbl: "Property Listings", badge: DB.listings.filter(l => l.status === "pending").length || null },
+    { id: "analytics", ico: "📈", lbl: "Analytics" },
   ];
 
   const titleMap = {
@@ -185,55 +108,59 @@ export default function AdminApp({ currentUser, onLogout }) {
         sub="Admin Console"
         navItems={navItems}
         nav={nav}
-        onNav={setNav}
+        onNav={id => { if (id === "listings") refreshListings(); setNav(id); }}
         currentUser={currentUser}
         onLogout={onLogout}
       />
 
       <div className="main-wrap">
         <div className="topbar">
-          <div className="tb-title">{titleMap[nav] || "Admin Console"}</div>
+          <div className="tb-title">{titleMap[nav]}</div>
           <div className="tb-right">
-            {nav === "recommendations" && <button className="btn-p" onClick={() => setModal("addRec")}>+ Add Recommendation</button>}
+            {nav === "recommendations" && (
+              <button className="btn-p" onClick={() => setModal("addRec")}>+ Add Recommendation</button>
+            )}
           </div>
         </div>
 
         <div className="page">
-          {loading ? (
-            <div className="sc"><div className="sc-title">Loading admin workspace...</div></div>
-          ) : (
-            <>
-              {nav === "dashboard" && <AdminDashboard recs={recs} listings={listings} />}
-              {nav === "recommendations" && (
-                <AdminRecommendations
-                  filteredRecs={filteredRecs}
-                  filter={filter}
-                  setFilter={setFilter}
-                  onDelete={handleDeleteRec}
-                  showToast={showToast}
-                  deletingId={deletingId}
-                />
-              )}
-              {nav === "listings" && (
-                <AdminListings
-                  listings={listings}
-                  listingFilter={listingFilter}
-                  setListingFilter={setListingFilter}
-                  searchTerm={listingSearch}
-                  setSearchTerm={setListingSearch}
-                  onApprove={handleApproveListing}
-                  onReject={handleRejectPrompt}
-                  onDelete={handleDeleteListing}
-                />
-              )}
-              {nav === "analytics" && <AdminAnalytics analytics={analytics} />}
-            </>
+          {nav === "dashboard" && <AdminDashboard recs={recs} listings={listings} />}
+
+          {nav === "recommendations" && (
+            <AdminRecommendations
+              recs={recs}
+              filteredRecs={filteredRecs}
+              filter={filter}
+              setFilter={setFilter}
+              onDelete={handleDeleteRec}
+              showToast={showToast}
+            />
           )}
+
+          {nav === "listings" && (
+            <AdminListings
+              listings={listings}
+              listingFilter={listingFilter}
+              setListingFilter={setListingFilter}
+              searchTerm={listingSearch}
+              setSearchTerm={setListingSearch}
+              onApprove={handleApproveListing}
+              onReject={handleRejectPrompt}
+              onDelete={handleDeleteListing}
+            />
+          )}
+
+          {nav === "analytics" && <AdminAnalytics />}
         </div>
       </div>
 
       {modal === "addRec" && (
-        <AddRecModal newRec={newRec} setNewRec={setNewRec} onAdd={addRec} onClose={() => setModal(null)} saving={savingRec} />
+        <AddRecModal
+          newRec={newRec}
+          setNewRec={setNewRec}
+          onAdd={addRec}
+          onClose={() => setModal(null)}
+        />
       )}
 
       {modal === "rejectListing" && (
